@@ -11,7 +11,8 @@ async function request(path: string, options: RequestInit = {}): Promise<Respons
     ...(options.headers as Record<string, string> || {}),
   };
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    // Use X-Auth-Token to avoid conflicts with tunnel proxy Basic Auth
+    headers["X-Auth-Token"] = token;
   }
   const response = await fetch(`${API_URL}${path}`, {
     ...options,

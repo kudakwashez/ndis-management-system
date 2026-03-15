@@ -2,7 +2,7 @@ import jwt
 import bcrypt
 import os
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.database import get_db
 
@@ -10,7 +10,7 @@ SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "ndis-secret-key-change-in-product
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 def hash_password(password: str) -> str:
@@ -31,8 +31,22 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
+def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    token = None
+    # First check X-Auth-Token header (used when Authorization carries tunnel Basic Auth)
+    x_auth_token = request.headers.get("x-auth-token")
+    if x_auth_token:
+        token = x_auth_token
+    # Fall back to standard Bearer token from Authorization header
+    elif credentials and credentials.scheme.lower() == "bearer":
+        token = credentials.credentials
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
