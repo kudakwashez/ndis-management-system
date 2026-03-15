@@ -1,5 +1,9 @@
-from fastapi import FastAPI, Depends
+import os
+from pathlib import Path
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.database import init_db
 from app.auth import get_current_user
 from app.routes.auth_routes import router as auth_router
@@ -49,3 +53,15 @@ def get_me(user: dict = Depends(get_current_user)):
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}
+
+# Serve frontend static files
+STATIC_DIR = Path(__file__).parent.parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="static-assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(request: Request, full_path: str):
+        file_path = STATIC_DIR / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(STATIC_DIR / "index.html"))
